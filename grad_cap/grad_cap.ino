@@ -29,6 +29,7 @@ int state = ALTERNATE_STATE;
 unsigned long previousMillis = 0;
 unsigned long previousStateMillis = 0;
 bool playingMusic = false;
+bool displayingLEDs = true;
 
 LiquidCrystal lcd(RESET, ENABLE, D4, D5, D6, D7);
 
@@ -89,8 +90,9 @@ unsigned long noteStartTime = 0; // Time when the current note started playing
 int currentNote = 0; // Current note being played
 bool isPlayingNote = false; // Flag to check if a note is currently playing
 
-BLEService buzzerService("180A");
-BLEByteCharacteristic switchCharacteristic("2A57", BLERead | BLEWrite);
+BLEService gradCapService("180A");
+BLEByteCharacteristic buzzerChar("2A57", BLERead | BLEWrite);
+BLEByteCharacteristic ledChar("2A58", BLERead | BLEWrite);
 
 void setup() {
   // LCD
@@ -116,10 +118,12 @@ void setup() {
     while (1);
   }
   BLE.setLocalName("Alyssa's Grad Cap");
-  BLE.setAdvertisedService(buzzerService);
-  buzzerService.addCharacteristic(switchCharacteristic);
-  BLE.addService(buzzerService);
-  switchCharacteristic.writeValue(0);
+  BLE.setAdvertisedService(gradCapService);
+  gradCapService.addCharacteristic(buzzerChar);
+  gradCapService.addCharacteristic(ledChar);
+  BLE.addService(gradCapService);
+  buzzerChar.writeValue(0);
+  ledChar.writeValue(1);
   BLE.advertise();
 }
 
@@ -128,14 +132,14 @@ void loop() {
   if (central) {
     while (central.connected()) {
       digitalWrite(LED_BUILTIN, HIGH);
-      if (switchCharacteristic.written()) {
-        if (switchCharacteristic.value() == 1) {   // any value other than 0
+      if (buzzerChar.written()) {
+        if (buzzerChar.value() == 1) {   // any value other than 0
           playingMusic = true;
           divider = 0;
           noteDuration = 0;
           noteStartTime = 0;
           currentNote = 0;
-        } else if (switchCharacteristic.value() == 0) {
+        } else if (buzzerChar.value() == 0) {
           playingMusic = false;
           divider = 0;
           noteDuration = 0;
@@ -143,10 +147,17 @@ void loop() {
           currentNote = 0;
         }
       }
+      if (ledChar.written()) {
+        if (ledChar.value() == 1) {   // any value other than 0
+          displayingLEDs = true;
+        } else if (ledChar.value() == 0) {
+          displayingLEDs = false;
+        }
+      }
+      display();
     }
     // central disconnected
     digitalWrite(LED_BUILTIN, LOW);
-    display();
   } else {
     display();
   }
@@ -163,7 +174,13 @@ void display() {
   // LED and LCD
   if (currentMillis - previousMillis >= 1000) {
     previousMillis = currentMillis;
-    displayLEDs(currentMillis);
+    if (displayingLEDs) {
+      displayLEDs(currentMillis);
+    } else {
+      for (int i = 0; i < 8; i++) {
+        digitalWrite(alternateOrder[i], LOW);
+      }
+    }
     displayLCD();
   }
 }
