@@ -1,7 +1,7 @@
 #include <LiquidCrystal.h>
 #include <ArduinoBLE.h>
 #include <string.h>
-#include "pitches.h"
+#include "pitches.h" // Source: https://github.com/robsoncouto/arduino-songs
 
 #define D4 2
 #define D5 3
@@ -37,7 +37,8 @@ int currentLED = 0;
 bool blueSide = true;
 int lcdIndex = 0;
 
-int tempo = 100; // bpm
+// Pomp and Circumstance: https://musescore.com/user/16021681/scores/4603731
+// Encoded from sheet music to Arduino code by Axs Avenido
 int melody[] = {
   NOTE_C4, 2, NOTE_B3, 8, NOTE_C4, 8, NOTE_D4, 4, 
   NOTE_A3, 2, NOTE_G3, 2,
@@ -80,6 +81,7 @@ int melody[] = {
   NOTE_C5, 2, NOTE_C5, 8, NOTE_B4, 8, NOTE_A4, 4,
   NOTE_G4, 4, NOTE_G4, 8, NOTE_G4, 8, NOTE_G4, 2
 };
+int tempo = 100; // bpm
 int notes = sizeof(melody) / sizeof(melody[0]) / 2;
 int wholenote = (60000 * 4) / tempo; // ms
 int divider = 0, noteDuration = 0;
@@ -107,9 +109,10 @@ void setup() {
 
   // BLE
   pinMode(BUZZER, OUTPUT);
+  pinMode(LED_BUILTIN, OUTPUT);
+  digitalWrite(LED_BUILTIN, LOW);
   if (!BLE.begin()) {
     Serial.println("starting Bluetooth® Low Energy module failed!");
-
     while (1);
   }
   BLE.setLocalName("Alyssa's Grad Cap");
@@ -124,6 +127,7 @@ void loop() {
   BLEDevice central = BLE.central();
   if (central) {
     while (central.connected()) {
+      digitalWrite(LED_BUILTIN, HIGH);
       if (switchCharacteristic.written()) {
         if (switchCharacteristic.value() == 1) {   // any value other than 0
           playingMusic = true;
@@ -139,30 +143,28 @@ void loop() {
           currentNote = 0;
         }
       }
-
-      unsigned long currentMillis = millis();
-
-      // buzzer
-      if (playingMusic) {
-        playMusic(currentMillis);
-      }
-
-      // LED and LCD
-      if (currentMillis - previousMillis >= 1000) {
-        previousMillis = currentMillis;
-        displayLEDs(currentMillis);
-        displayLCD();
-      }
     }
+    // central disconnected
+    digitalWrite(LED_BUILTIN, LOW);
+    display();
   } else {
-    unsigned long currentMillis = millis();
+    display();
+  }
+}
 
-    // LED and LCD
-    if (currentMillis - previousMillis >= 1000) {
-      previousMillis = currentMillis;
-      displayLEDs(currentMillis);
-      displayLCD();
-    }
+void display() {
+  unsigned long currentMillis = millis();
+
+  // buzzer
+  if (playingMusic) {
+    playMusic(currentMillis);
+  }
+
+  // LED and LCD
+  if (currentMillis - previousMillis >= 1000) {
+    previousMillis = currentMillis;
+    displayLEDs(currentMillis);
+    displayLCD();
   }
 }
 
@@ -256,8 +258,10 @@ void displayLCD() {
     String line1 = "Now Playing:";
     String line2 = "<< Pomp and Circumstance >> ";
 
+    // line 1
     lcd.setCursor(2, 0);
     lcd.print(line1);
+    // line 2
     lcd.setCursor(0, 1);
     lcd.print(line2.substring(lcdIndex));  // Print the substring of text from position lcdIndex to the end
     if (lcdIndex > 0) {
@@ -286,5 +290,3 @@ void displayLCD() {
     lcd.print(line2);
   }
 }
-
-
